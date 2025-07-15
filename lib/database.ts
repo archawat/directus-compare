@@ -1,68 +1,84 @@
-import sql from 'mssql';
+import { Knex, knex } from 'knex';
+
+export interface DatabaseConfig {
+  type: 'mssql' | 'mysql' | 'pg' | 'sqlite3';
+  host?: string;
+  port?: number;
+  database?: string;
+  user?: string;
+  password?: string;
+  ssl?: boolean;
+  filename?: string;
+}
 
 export class DatabaseConnection {
-  private pool: sql.ConnectionPool | null = null;
-  private config: sql.config;
+  private knexInstance: Knex | null = null;
+  private config: DatabaseConfig;
   private isConnecting = false;
 
-  constructor(connectionString: string) {
-    this.config = this.parseConnectionString(connectionString);
+  constructor(config: DatabaseConfig) {
+    this.config = config;
   }
 
-  private parseConnectionString(connectionString: string): sql.config {
-    if (!connectionString || typeof connectionString !== 'string') {
-      throw new Error(`Invalid connection string: ${connectionString}`);
-    }
-
-    const params = new Map<string, string>();
-    
-    // Parse connection string parameters
-    connectionString.split(';').forEach(part => {
-      const trimmedPart = part.trim();
-      if (trimmedPart) {
-        const equalIndex = trimmedPart.indexOf('=');
-        if (equalIndex > 0) {
-          const key = trimmedPart.substring(0, equalIndex).trim().toLowerCase();
-          const value = trimmedPart.substring(equalIndex + 1).trim();
-          if (key && value) {
-            params.set(key, value);
-          }
-        }
-      }
-    });
-
-    const server = params.get('server') || params.get('data source') || params.get('host');
-    const database = params.get('database') || params.get('initial catalog');
-    const user = params.get('user id') || params.get('uid') || params.get('username');
-    const password = params.get('password') || params.get('pwd');
-
-    if (!server || typeof server !== 'string') {
-      throw new Error(`Server/Data Source not found or invalid in connection string. Available keys: ${Array.from(params.keys()).join(', ')}`);
-    }
-
-    const config: sql.config = {
-      server: server,
-      database: database || '',
-      user: user || '',
-      password: password || '',
-      options: {
-        encrypt: params.get('encrypt') === 'true',
-        trustServerCertificate: params.get('trustservercertificate') === 'true' || true,
-        enableArithAbort: true,
-      },
+  private createKnexConfig(): Knex.Config {
+    const baseConfig: Knex.Config = {
+      client: this.config.type,
     };
 
-    // Handle integrated security
-    if (params.get('integrated security') === 'true' || params.get('trusted_connection') === 'true') {
-      delete config.user;
-      delete config.password;
+    switch (this.config.type) {
+      case 'mssql':
+        baseConfig.connection = {
+          server: this.config.host!,
+          port: this.config.port || 1433,
+          database: this.config.database!,
+          user: this.config.user!,
+          password: this.config.password!,
+          options: {
+            encrypt: this.config.ssl || false,
+            trustServerCertificate: true,
+            enableArithAbort: true,
+          },
+        };
+        break;
+      
+      case 'mysql':
+        baseConfig.connection = {
+          host: this.config.host!,
+          port: this.config.port || 3306,
+          database: this.config.database!,
+          user: this.config.user!,
+          password: this.config.password!,
+          ssl: this.config.ssl ? {} : false,
+        };
+        break;
+      
+      case 'pg':
+        baseConfig.connection = {
+          host: this.config.host!,
+          port: this.config.port || 5432,
+          database: this.config.database!,
+          user: this.config.user!,
+          password: this.config.password!,
+          ssl: this.config.ssl ? { rejectUnauthorized: false } : false,
+        };
+        break;
+      
+      case 'sqlite3':
+        baseConfig.connection = {
+          filename: this.config.filename!,
+        };
+        baseConfig.useNullAsDefault = true;
+        break;
+      
+      default:
+        throw new Error(`Unsupported database type: ${this.config.type}`);
     }
 
-    return config;
+    return baseConfig;
   }
 
   async connect(): Promise<void> {
-    if (this.pool && this.pool.connected) {
+    if (this.knexInstance) {
       return;
     }
     
@@ -76,58 +92,106 @@ export class DatabaseConnection {
 
     this.isConnecting = true;
     try {
-      if (this.pool) {
-        await this.pool.close();
-      }
-      this.pool = new sql.ConnectionPool(this.config);
-      await this.pool.connect();
+      const knexConfig = this.createKnexConfig();
+      this.knexInstance = knex(knexConfig);
+      
+      // Test the connection
+      await this.knexInstance.raw('SELECT 1');
     } finally {
       this.isConnecting = false;
     }
   }
 
   async disconnect(): Promise<void> {
-    if (this.pool) {
-      await this.pool.close();
-      this.pool = null;
+    if (this.knexInstance) {
+      await this.knexInstance.destroy();
+      this.knexInstance = null;
     }
   }
 
   getConnectionInfo() {
     return {
-      server: this.config.server,
-      database: this.config.database,
+      server: this.config.host || this.config.filename || 'unknown',
+      database: this.config.database || this.config.filename || 'unknown',
+      type: this.config.type,
     };
   }
 
   async testConnection(): Promise<boolean> {
     try {
       await this.connect();
-      const result = await this.query('SELECT 1 as test');
-      return result.recordset.length > 0;
+      const testQuery = this.config.type === 'mssql' ? 'SELECT 1 as test' : 'SELECT 1';
+      const result = await this.knexInstance!.raw(testQuery);
+      return result && result.length > 0;
     } catch (error) {
       console.error('Database connection test failed:', error);
       return false;
     }
   }
 
-  async query(queryText: string, params?: any[]): Promise<sql.IResult<any>> {
+  async query(queryText: string, params?: any[]): Promise<any> {
     await this.connect();
     
-    if (!this.pool || !this.pool.connected) {
+    if (!this.knexInstance) {
       throw new Error('Database connection is not available');
     }
     
-    const request = this.pool.request();
-    
-    if (params) {
-      params.forEach((param, index) => {
-        request.input(`param${index}`, param);
-      });
+    if (params && params.length > 0) {
+      return await this.knexInstance.raw(queryText, params);
+    } else {
+      return await this.knexInstance.raw(queryText);
     }
-    
-    return await request.query(queryText);
   }
+
+  getKnexInstance(): Knex {
+    if (!this.knexInstance) {
+      throw new Error('Database not connected. Call connect() first.');
+    }
+    return this.knexInstance;
+  }
+}
+
+function createDatabaseConfig(prefix: 'SOURCE' | 'TARGET'): DatabaseConfig | null {
+  const dbType = process.env.DB_TYPE as DatabaseConfig['type'];
+  
+  if (!dbType) {
+    console.error('DB_TYPE environment variable is required');
+    return null;
+  }
+
+  if (dbType === 'sqlite3') {
+    const filename = process.env[`${prefix}_DB_FILENAME`];
+    if (!filename) {
+      console.error(`${prefix}_DB_FILENAME is required for SQLite`);
+      return null;
+    }
+    return {
+      type: 'sqlite3',
+      filename,
+    };
+  }
+
+  const host = process.env[`${prefix}_DB_HOST`];
+  const database = process.env[`${prefix}_DB_NAME`];
+  const user = process.env[`${prefix}_DB_USER`];
+  const password = process.env[`${prefix}_DB_PASSWORD`];
+  const portStr = process.env[`${prefix}_DB_PORT`];
+  const sslStr = process.env[`${prefix}_DB_SSL`];
+
+  if (!host || !database || !user || !password) {
+    console.error(`Missing required environment variables for ${prefix} database`);
+    return null;
+  }
+
+  return {
+    type: dbType,
+    host,
+    port: portStr ? parseInt(portStr, 10) : undefined,
+    database,
+    user,
+    password,
+    ssl: sslStr === 'true',
+  };
 }
 
 // Create database connections only if environment variables are set
@@ -135,8 +199,9 @@ let sourceDb: DatabaseConnection | null = null;
 let targetDb: DatabaseConnection | null = null;
 
 try {
-  if (process.env.SOURCE_DB_CONNECTION_STRING) {
-    sourceDb = new DatabaseConnection(process.env.SOURCE_DB_CONNECTION_STRING);
+  const sourceConfig = createDatabaseConfig('SOURCE');
+  if (sourceConfig) {
+    sourceDb = new DatabaseConnection(sourceConfig);
   }
 } catch (error) {
   console.error('Error creating source database connection:', error);
@@ -144,8 +209,9 @@ try {
 }
 
 try {
-  if (process.env.TARGET_DB_CONNECTION_STRING) {
-    targetDb = new DatabaseConnection(process.env.TARGET_DB_CONNECTION_STRING);
+  const targetConfig = createDatabaseConfig('TARGET');
+  if (targetConfig) {
+    targetDb = new DatabaseConnection(targetConfig);
   }
 } catch (error) {
   console.error('Error creating target database connection:', error);

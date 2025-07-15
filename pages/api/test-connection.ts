@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           results.source.error = 'Connection test failed';
         }
       } else {
-        results.source.error = 'SOURCE_DB_CONNECTION_STRING not configured';
+        results.source.error = 'Source database configuration not found';
       }
     } catch (error) {
       results.source.error = error instanceof Error ? error.message : 'Unknown error';
@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           results.target.error = 'Connection test failed';
         }
       } else {
-        results.target.error = 'TARGET_DB_CONNECTION_STRING not configured';
+        results.target.error = 'Target database configuration not found';
       }
     } catch (error) {
       results.target.error = error instanceof Error ? error.message : 'Unknown error';
@@ -63,8 +63,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: bothConnected ? 'All connections successful' : 'Some connections failed',
       results,
       env: {
-        hasSourceConnection: !!process.env.SOURCE_DB_CONNECTION_STRING,
-        hasTargetConnection: !!process.env.TARGET_DB_CONNECTION_STRING,
+        hasSourceConnection: !!process.env.SOURCE_DB_HOST || !!process.env.SOURCE_DB_FILENAME,
+        hasTargetConnection: !!process.env.TARGET_DB_HOST || !!process.env.TARGET_DB_FILENAME,
+        dbType: process.env.DB_TYPE || 'not configured',
       }
     });
   } catch (error) {

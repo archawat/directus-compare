@@ -50,7 +50,21 @@ export class PermissionComparator {
     `;
     
     const result = await db.query(query);
-    return result.recordset;
+    
+    // Handle different result structures from different database drivers
+    if (result.recordset) {
+      // MSSQL returns recordset
+      return result.recordset;
+    } else if (result.rows) {
+      // PostgreSQL returns rows
+      return result.rows;
+    } else if (Array.isArray(result)) {
+      // MySQL/SQLite return array directly
+      return result;
+    } else {
+      // Handle other cases
+      return result;
+    }
   }
 
   private createPermissionKey(permission: Permission): string {
@@ -181,7 +195,7 @@ export class PermissionComparator {
   private async createPermission(permission: Permission): Promise<void> {
     const query = `
       INSERT INTO directus_permissions (policy, collection, action, permissions, validation, presets, fields)
-      VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     
     // Normalize fields before storing
@@ -201,8 +215,8 @@ export class PermissionComparator {
   private async updatePermission(sourcePermission: Permission, targetId: number): Promise<void> {
     const query = `
       UPDATE directus_permissions 
-      SET permissions = @param0, validation = @param1, presets = @param2, fields = @param3
-      WHERE id = @param4
+      SET permissions = ?, validation = ?, presets = ?, fields = ?
+      WHERE id = ?
     `;
     
     // Normalize fields before storing
@@ -218,7 +232,7 @@ export class PermissionComparator {
   }
 
   private async deletePermission(permission: Permission): Promise<void> {
-    const query = `DELETE FROM directus_permissions WHERE id = @param0`;
+    const query = `DELETE FROM directus_permissions WHERE id = ?`;
     await this.targetDb.query(query, [permission.id]);
   }
 }
