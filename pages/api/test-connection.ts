@@ -1,10 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { sourceDb, targetDb } from '../../lib/database';
+import { getSourceDb, getTargetDb, getConnectionInfo } from '../../lib/database';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
+
+  const flipped = req.query.flipped === 'true';
 
   const results = {
     source: { 
@@ -22,6 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   try {
+    const sourceDb = getSourceDb(flipped);
+    const targetDb = getTargetDb(flipped);
+    
     // Test source database
     try {
       if (sourceDb) {

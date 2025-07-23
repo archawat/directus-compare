@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { sourceDb, targetDb } from '../../lib/database';
+import { getSourceDb, getTargetDb } from '../../lib/database';
 import { PermissionComparator, PermissionDiff } from '../../lib/permissions';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -8,14 +8,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const { diffs, flipped }: { diffs: PermissionDiff[], flipped?: boolean } = req.body;
+    const sourceDb = getSourceDb(flipped);
+    const targetDb = getTargetDb(flipped);
+    
     if (!sourceDb || !targetDb) {
       return res.status(400).json({
         success: false,
         message: 'Database connections not configured. Please check your environment variables.'
       });
     }
-
-    const { diffs }: { diffs: PermissionDiff[] } = req.body;
     
     if (!diffs || !Array.isArray(diffs)) {
       return res.status(400).json({ 
@@ -24,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const comparator = new PermissionComparator(sourceDb, targetDb);
+    const comparator = new PermissionComparator(sourceDb, targetDb, flipped);
     const results = [];
 
     for (const diff of diffs) {

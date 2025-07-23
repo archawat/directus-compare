@@ -29,6 +29,14 @@
     @apply bg-green-600 text-white hover:bg-green-700;
   }
   
+  .btn-info {
+    @apply bg-blue-500 text-white hover:bg-blue-600;
+  }
+  
+  .btn-warning {
+    @apply bg-orange-500 text-white hover:bg-orange-600;
+  }
+  
   .card {
     @apply bg-white rounded-lg shadow-md border border-gray-200;
   }

@@ -219,3 +219,21 @@ try {
 }
 
 export { sourceDb, targetDb };
+
+export function getSourceDb(flipped = false): DatabaseConnection | null {
+  return flipped ? targetDb : sourceDb;
+}
+
+export function getTargetDb(flipped = false): DatabaseConnection | null {
+  return flipped ? sourceDb : targetDb;
+}
+
+export function getConnectionInfo(flipped = false) {
+  const source = getSourceDb(flipped);
+  const target = getTargetDb(flipped);
+  
+  return {
+    source: source ? source.getConnectionInfo() : null,
+    target: target ? target.getConnectionInfo() : null,
+  };
+}

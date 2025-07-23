@@ -26,10 +26,20 @@ export interface PermissionDiff {
 export class PermissionComparator {
   private sourceDb: DatabaseConnection;
   private targetDb: DatabaseConnection;
+  private flipped: boolean;
 
-  constructor(sourceDb: DatabaseConnection, targetDb: DatabaseConnection) {
+  constructor(sourceDb: DatabaseConnection, targetDb: DatabaseConnection, flipped = false) {
     this.sourceDb = sourceDb;
     this.targetDb = targetDb;
+    this.flipped = flipped;
+  }
+
+  private getActualSourceDb(): DatabaseConnection {
+    return this.flipped ? this.targetDb : this.sourceDb;
+  }
+
+  private getActualTargetDb(): DatabaseConnection {
+    return this.flipped ? this.sourceDb : this.targetDb;
   }
 
   async getPermissions(db: DatabaseConnection): Promise<Permission[]> {
@@ -97,8 +107,8 @@ export class PermissionComparator {
   }
 
   async comparePermissions(): Promise<PermissionDiff[]> {
-    const sourcePermissions = await this.getPermissions(this.sourceDb);
-    const targetPermissions = await this.getPermissions(this.targetDb);
+    const sourcePermissions = await this.getPermissions(this.getActualSourceDb());
+    const targetPermissions = await this.getPermissions(this.getActualTargetDb());
 
     // Get policies that exist in both servers
     const sourcePolicies = new Set(sourcePermissions.map(p => p.policy));
@@ -183,12 +193,32 @@ export class PermissionComparator {
   }
 
   async syncPermission(diff: PermissionDiff): Promise<void> {
-    if (!diff.sourcePermission) {
-      await this.deletePermission(diff.targetPermission!);
-    } else if (!diff.targetPermission) {
-      await this.createPermission(diff.sourcePermission);
+    // When flipped, we need to reverse the logic because:
+    // - diff.sourcePermission comes from what's now the target DB
+    // - diff.targetPermission comes from what's now the source DB
+    // - But sync should still go from actual source TO actual target
+    
+    if (this.flipped) {
+      // In flipped mode, reverse the sync logic
+      if (!diff.targetPermission) {
+        // No permission in actual source (was target), so delete from actual target (was source)
+        await this.deletePermission(diff.sourcePermission!);
+      } else if (!diff.sourcePermission) {
+        // No permission in actual target (was source), so create in actual target from actual source
+        await this.createPermission(diff.targetPermission);
+      } else {
+        // Both exist, update actual target with actual source data
+        await this.updatePermission(diff.targetPermission, diff.sourcePermission.id);
+      }
     } else {
-      await this.updatePermission(diff.sourcePermission, diff.targetPermission.id);
+      // Normal mode - original logic
+      if (!diff.sourcePermission) {
+        await this.deletePermission(diff.targetPermission!);
+      } else if (!diff.targetPermission) {
+        await this.createPermission(diff.sourcePermission);
+      } else {
+        await this.updatePermission(diff.sourcePermission, diff.targetPermission.id);
+      }
     }
   }
 
@@ -201,7 +231,7 @@ export class PermissionComparator {
     // Normalize fields before storing
     const normalizedFields = this.normalizeFields(permission.fields);
     
-    await this.targetDb.query(query, [
+    await this.getActualTargetDb().query(query, [
       permission.policy,
       permission.collection,
       permission.action,
@@ -222,7 +252,7 @@ export class PermissionComparator {
     // Normalize fields before storing
     const normalizedFields = this.normalizeFields(sourcePermission.fields);
     
-    await this.targetDb.query(query, [
+    await this.getActualTargetDb().query(query, [
       sourcePermission.permissions,
       sourcePermission.validation,
       sourcePermission.presets,
@@ -233,6 +263,6 @@ export class PermissionComparator {
 
   private async deletePermission(permission: Permission): Promise<void> {
     const query = `DELETE FROM directus_permissions WHERE id = ?`;
-    await this.targetDb.query(query, [permission.id]);
+    await this.getActualTargetDb().query(query, [permission.id]);
   }
 }

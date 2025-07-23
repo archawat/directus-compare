@@ -61,11 +61,12 @@ export default function Home() {
     identical: false
   });
   const [selectedPolicy, setSelectedPolicy] = useState<string>('all');
+  const [sidesFlipped, setSidesFlipped] = useState(false);
 
   const testConnections = async () => {
     setTestingConnection(true);
     try {
-      const response = await fetch('/api/test-connection');
+      const response = await fetch(`/api/test-connection?flipped=${sidesFlipped}`);
       const result: ConnectionTestResult = await response.json();
       setConnectionStatus(result);
       
@@ -88,7 +89,7 @@ export default function Home() {
     
     setLoading(true);
     try {
-      const response = await fetch('/api/compare');
+      const response = await fetch(`/api/compare?flipped=${sidesFlipped}`);
       const result: ComparisonResult = await response.json();
       
       if (result.success) {
@@ -103,6 +104,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleSides = () => {
+    setSidesFlipped(!sidesFlipped);
+    setSelectedDiffs([]);
+    setDiffs([]);
+    setSummary(null);
+    setConnectionStatus(null);
   };
 
   const syncPermissions = async () => {
@@ -120,7 +129,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ diffs: diffsToSync }),
+        body: JSON.stringify({ diffs: diffsToSync, flipped: sidesFlipped }),
       });
       
       const result = await response.json();
@@ -218,7 +227,7 @@ export default function Home() {
 
   useEffect(() => {
     testConnections();
-  }, []);
+  }, [sidesFlipped]);
 
   return (
     <>
@@ -244,7 +253,6 @@ export default function Home() {
             >
               {testingConnection ? 'Testing...' : 'Test Connections'}
             </button>
-            
             
             <button
               onClick={fetchComparison}
@@ -301,7 +309,13 @@ export default function Home() {
                 </div>
                 
                 <div className="flex items-center justify-center px-4">
-                  <span className="text-2xl text-blue-600">→</span>
+                  <button
+                    onClick={toggleSides}
+                    className={`btn ${sidesFlipped ? 'btn-warning' : 'btn-info'} flex items-center px-3 py-2`}
+                    title="Click to toggle direction"
+                  >
+                    <span className="text-lg">⇄</span>
+                  </button>
                 </div>
                 
                 <div className="flex items-center flex-1 justify-end">
@@ -425,6 +439,7 @@ export default function Home() {
               selectedDiffs={selectedDiffs}
               onDiffSelect={handleDiffSelect}
               onViewDiff={handleViewDiff}
+              sidesFlipped={sidesFlipped}
             />
           )}
 
@@ -432,6 +447,7 @@ export default function Home() {
             <DiffViewer
               diff={selectedDiff}
               onClose={() => setShowDiffViewer(false)}
+              sidesFlipped={sidesFlipped}
             />
           )}
         </div>

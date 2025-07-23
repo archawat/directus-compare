@@ -1,12 +1,14 @@
 import React from 'react';
 import { PermissionDiff } from '../lib/permissions';
+import CollapsiblePanel from './CollapsiblePanel';
 
 interface DiffViewerProps {
   diff: PermissionDiff;
   onClose: () => void;
+  sidesFlipped?: boolean;
 }
 
-const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
+const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose, sidesFlipped = false }) => {
   const normalizeFields = (fieldsString: string | null): string | null => {
     if (!fieldsString) return fieldsString;
     return fieldsString
@@ -41,11 +43,20 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
     const source = formatFieldsList(sourceFields);
     const target = formatFieldsList(targetFields);
     
-    const added = source.filter(field => !target.includes(field));
-    const removed = target.filter(field => !source.includes(field));
-    const common = source.filter(field => target.includes(field));
-    
-    return { added, removed, common };
+    // When sides are flipped, we need to reverse the perspective
+    if (sidesFlipped) {
+      // In flipped mode: source becomes target, target becomes source
+      const added = target.filter(field => !source.includes(field));
+      const removed = source.filter(field => !target.includes(field));
+      const common = source.filter(field => target.includes(field));
+      return { added, removed, common };
+    } else {
+      // Normal mode
+      const added = source.filter(field => !target.includes(field));
+      const removed = target.filter(field => !source.includes(field));
+      const common = source.filter(field => target.includes(field));
+      return { added, removed, common };
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -87,28 +98,8 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`border-2 rounded-lg p-4 ${getStatusColor(diff.status)}`}>
-              <h3 className="font-semibold text-gray-900 mb-3">Source (Left)</h3>
-              <div className="bg-white rounded border p-3">
-                <pre className="text-sm text-gray-800 whitespace-pre-wrap">
-                  {formatPermissionData(diff.sourcePermission)}
-                </pre>
-              </div>
-            </div>
-
-            <div className={`border-2 rounded-lg p-4 ${getStatusColor(diff.status)}`}>
-              <h3 className="font-semibold text-gray-900 mb-3">Target (Right)</h3>
-              <div className="bg-white rounded border p-3">
-                <pre className="text-sm text-gray-800 whitespace-pre-wrap">
-                  {formatPermissionData(diff.targetPermission)}
-                </pre>
-              </div>
-            </div>
-          </div>
-
           {diff.status === 'modified' && diff.sourcePermission && diff.targetPermission && (
-            <div className="mt-6">
+            <div>
               <h3 className="font-semibold text-gray-900 mb-3">Detailed Changes</h3>
               <div className="space-y-4">
                 {Object.entries(diff.sourcePermission).map(([key, sourceValue]) => {
@@ -215,7 +206,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
                               <span className="text-sm text-blue-600 font-medium">Source:</span>
                               <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-1">
                                 {key === 'permissions' || key === 'validation' || key === 'presets' ? (
-                                  <pre className="text-xs text-gray-800 whitespace-pre-wrap">
+                                  <pre className="text-xs text-gray-800 whitespace-pre-wrap break-words overflow-x-auto">
                                     {sourceValue ? JSON.stringify(JSON.parse(sourceValue), null, 2) : 'null'}
                                   </pre>
                                 ) : key === 'fields' ? (
@@ -229,7 +220,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
                               <span className="text-sm text-orange-600 font-medium">Target:</span>
                               <div className="bg-orange-50 border border-orange-200 rounded p-3 mt-1">
                                 {key === 'permissions' || key === 'validation' || key === 'presets' ? (
-                                  <pre className="text-xs text-gray-800 whitespace-pre-wrap">
+                                  <pre className="text-xs text-gray-800 whitespace-pre-wrap break-words overflow-x-auto">
                                     {targetValue ? JSON.stringify(JSON.parse(targetValue), null, 2) : 'null'}
                                   </pre>
                                 ) : key === 'fields' ? (
@@ -249,6 +240,32 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
               </div>
             </div>
           )}
+
+          <CollapsiblePanel 
+            title="Full Permission Data" 
+            className="mt-6"
+            defaultExpanded={false}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className={`border-2 rounded-lg p-4 ${getStatusColor(diff.status)}`}>
+                <h4 className="font-semibold text-gray-900 mb-3">Source (Left)</h4>
+                <div className="bg-white rounded border p-3">
+                  <pre className="text-sm text-gray-800 whitespace-pre-wrap break-words overflow-x-auto">
+                    {formatPermissionData(diff.sourcePermission)}
+                  </pre>
+                </div>
+              </div>
+
+              <div className={`border-2 rounded-lg p-4 ${getStatusColor(diff.status)}`}>
+                <h4 className="font-semibold text-gray-900 mb-3">Target (Right)</h4>
+                <div className="bg-white rounded border p-3">
+                  <pre className="text-sm text-gray-800 whitespace-pre-wrap break-words overflow-x-auto">
+                    {formatPermissionData(diff.targetPermission)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </CollapsiblePanel>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { sourceDb, targetDb } from '../../lib/database';
+import { getSourceDb, getTargetDb } from '../../lib/database';
 import { PermissionComparator } from '../../lib/permissions';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -8,6 +8,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const flipped = req.query.flipped === 'true';
+    const sourceDb = getSourceDb(flipped);
+    const targetDb = getTargetDb(flipped);
+    
     if (!sourceDb || !targetDb) {
       return res.status(400).json({
         success: false,
@@ -15,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const comparator = new PermissionComparator(sourceDb, targetDb);
+    const comparator = new PermissionComparator(sourceDb, targetDb, flipped);
     const diffs = await comparator.comparePermissions();
     
     res.status(200).json({
