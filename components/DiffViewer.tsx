@@ -43,20 +43,14 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose, sidesFlipped = f
     const source = formatFieldsList(sourceFields);
     const target = formatFieldsList(targetFields);
     
-    // When sides are flipped, we need to reverse the perspective
-    if (sidesFlipped) {
-      // In flipped mode: source becomes target, target becomes source
-      const added = target.filter(field => !source.includes(field));
-      const removed = source.filter(field => !target.includes(field));
-      const common = source.filter(field => target.includes(field));
-      return { added, removed, common };
-    } else {
-      // Normal mode
-      const added = source.filter(field => !target.includes(field));
-      const removed = target.filter(field => !source.includes(field));
-      const common = source.filter(field => target.includes(field));
-      return { added, removed, common };
-    }
+    // Backend already handles flipping by swapping the actual data in sourcePermission/targetPermission
+    // Sync direction: source -> target
+    // So "added" = fields in source that will be added to target (fields in source not in target)
+    // And "removed" = fields in target that will be removed (fields in target not in source)
+    const added = source.filter(field => !target.includes(field));
+    const removed = target.filter(field => !source.includes(field));
+    const common = source.filter(field => target.includes(field));
+    return { added, removed, common };
   };
 
   const getStatusColor = (status: string) => {
@@ -124,6 +118,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose, sidesFlipped = f
                               const fieldComparison = compareFields(normalizedSource, normalizedTarget);
                               return (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Backend already swaps the data when flipped, so always show source in Source column and target in Target column */}
                                   <div>
                                     <span className="text-sm text-blue-600 font-medium">Source Fields:</span>
                                     <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-1">
@@ -135,13 +130,13 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose, sidesFlipped = f
                                             <span 
                                               key={index}
                                               className={`px-2 py-1 text-xs rounded ${
-                                                fieldComparison.added.includes(field) 
-                                                  ? 'bg-green-100 text-green-800 border border-green-300' 
+                                                fieldComparison.removed.includes(field) 
+                                                  ? 'bg-red-100 text-red-800 border border-red-300' 
                                                   : 'bg-gray-100 text-gray-700'
                                               }`}
                                             >
                                               {field}
-                                              {fieldComparison.added.includes(field) && ' ➕'}
+                                              {fieldComparison.removed.includes(field) && ' ➖'}
                                             </span>
                                           ))}
                                         </div>
@@ -160,13 +155,13 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose, sidesFlipped = f
                                             <span 
                                               key={index}
                                               className={`px-2 py-1 text-xs rounded ${
-                                                fieldComparison.removed.includes(field) 
-                                                  ? 'bg-red-100 text-red-800 border border-red-300' 
+                                                fieldComparison.added.includes(field) 
+                                                  ? 'bg-green-100 text-green-800 border border-green-300' 
                                                   : 'bg-gray-100 text-gray-700'
                                               }`}
                                             >
                                               {field}
-                                              {fieldComparison.removed.includes(field) && ' ➖'}
+                                              {fieldComparison.added.includes(field) && ' ➕'}
                                             </span>
                                           ))}
                                         </div>
@@ -201,7 +196,8 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose, sidesFlipped = f
                           </div>
                         ) : (
                           // Default handling for other fields
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {/* Backend already swaps the data when flipped, so always show source in Source column and target in Target column */}
                             <div>
                               <span className="text-sm text-blue-600 font-medium">Source:</span>
                               <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-1">
@@ -247,6 +243,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose, sidesFlipped = f
             defaultExpanded={false}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Backend already swaps the data when flipped, so always show source in Source column and target in Target column */}
               <div className={`border-2 rounded-lg p-4 ${getStatusColor(diff.status)}`}>
                 <h4 className="font-semibold text-gray-900 mb-3">Source (Left)</h4>
                 <div className="bg-white rounded border p-3">

@@ -64,20 +64,13 @@ const PermissionsList: React.FC<PermissionsListProps> = ({
     const sourceFields = normalizeFields(diff.sourcePermission.fields)?.split(',').filter(f => f) || [];
     const targetFields = normalizeFields(diff.targetPermission.fields)?.split(',').filter(f => f) || [];
 
-    // When sides are flipped, we need to reverse the perspective
-    if (sidesFlipped) {
-      // In flipped mode: source becomes target, target becomes source
-      // So "added" means fields that exist in target but not in source
-      // And "removed" means fields that exist in source but not in target
-      const added = targetFields.filter(field => !sourceFields.includes(field));
-      const removed = sourceFields.filter(field => !targetFields.includes(field));
-      return { added, removed };
-    } else {
-      // Normal mode: added = in source but not target, removed = in target but not source
-      const added = sourceFields.filter(field => !targetFields.includes(field));
-      const removed = targetFields.filter(field => !sourceFields.includes(field));
-      return { added, removed };
-    }
+    // Backend already handles flipping by swapping the actual data in sourcePermission/targetPermission
+    // Sync direction: source -> target
+    // So "added" = fields in source that will be added to target (fields in source not in target)
+    // And "removed" = fields in target that will be removed (fields in target not in source)
+    const added = sourceFields.filter(field => !targetFields.includes(field));
+    const removed = targetFields.filter(field => !sourceFields.includes(field));
+    return { added, removed };
   };
 
   const formatFieldChanges = (fields: string[]) => {
@@ -196,6 +189,7 @@ const PermissionsList: React.FC<PermissionsListProps> = ({
                     {diff.action.toUpperCase()}
                   </span>
                 </td>
+                {/* Backend already swaps the data when flipped, so always show sourcePermission in Source column and targetPermission in Target column */}
                 <td className="px-4 py-4 text-sm text-gray-600 max-w-24">
                   <div className="truncate" title={formatPermissionSummary(diff.sourcePermission)}>
                     {formatPermissionSummary(diff.sourcePermission)}

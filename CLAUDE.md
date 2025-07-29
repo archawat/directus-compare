@@ -116,6 +116,19 @@ Directus permissions table structure:
 - **API integration**: All endpoints respect the `flipped` parameter
 - **Comparison logic**: Field change analysis accounts for flipped perspective
 
+**CRITICAL IMPLEMENTATION NOTES**:
+1. **Backend handles all flipping**: When `flipped=true`, the backend swaps the actual database connections
+   - `getSourceDb(true)` returns targetDb
+   - `getTargetDb(true)` returns sourceDb
+2. **Frontend must NOT swap display**: Since backend already swaps the data, frontend components should always display:
+   - `diff.sourcePermission` in the "Source" column
+   - `diff.targetPermission` in the "Target" column
+3. **Field comparison logic**: 
+   - Sync direction is always source → target
+   - "Added" fields = fields in source not in target (will be added to target)
+   - "Removed" fields = fields in target not in source (will be removed from target)
+4. **Common mistake**: Do NOT add conditional display logic based on `sidesFlipped` in frontend components
+
 #### 7. Error Handling & UX
 - **Toast notifications**: Success/error messages with icons
 - **Connection validation**: Tests before comparison
@@ -190,14 +203,6 @@ TARGET_DB_FILENAME=./target.db
 - **MySQL**: Full support with SSL configuration
 - **PostgreSQL**: Complete support with SSL options
 - **SQLite**: File-based database support for development
-
-### Recent Improvements
-1. **Multi-database support**: Migrated from mssql-specific to Knex.js for broader database compatibility
-2. **CollapsiblePanel component**: Added reusable expandable sections for better UX
-3. **Optimized table layout**: Reduced Source/Target column widths for better space utilization
-4. **Enhanced diff viewer**: Organized with detailed changes first, raw data in collapsible panel
-5. **Consistent UI labeling**: Fixed confusing label switching in sides flipping functionality
-6. **Word-break support**: Improved handling of long JSON content in pre tags
 
 ### Known Limitations
 - Direct database access required

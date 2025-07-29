@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const comparator = new PermissionComparator(sourceDb, targetDb, flipped);
+    const comparator = new PermissionComparator(sourceDb, targetDb);
     const results = [];
 
     for (const diff of diffs) {
