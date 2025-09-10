@@ -53,7 +53,6 @@ export default function Home() {
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const [selectedDiff, setSelectedDiff] = useState<PermissionDiff | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionTestResult | null>(null);
-  const [testingConnection, setTestingConnection] = useState(false);
   const [statusFilters, setStatusFilters] = useState({
     added: true,
     removed: false,
@@ -64,7 +63,6 @@ export default function Home() {
   const [sidesFlipped, setSidesFlipped] = useState(false);
 
   const testConnections = async () => {
-    setTestingConnection(true);
     try {
       const response = await fetch(`/api/test-connection?flipped=${sidesFlipped}`);
       const result: ConnectionTestResult = await response.json();
@@ -75,8 +73,6 @@ export default function Home() {
       }
     } catch (error) {
       toast.error(`Failed to test connections: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setTestingConnection(false);
     }
   };
 
@@ -245,47 +241,25 @@ export default function Home() {
             <p className="text-gray-600">Compare and sync permissions between Directus instances</p>
           </div>
 
-          <div className="mb-6">
-            <button
-              onClick={testConnections}
-              disabled={testingConnection}
-              className="btn btn-secondary mr-4"
-            >
-              {testingConnection ? 'Testing...' : 'Test Connections'}
-            </button>
-            
+          <div className="mb-6 flex items-center gap-4">
             <button
               onClick={fetchComparison}
               disabled={loading || !connectionStatus?.success}
-              className="btn btn-primary mr-4"
+              className="btn btn-primary"
             >
               {loading ? 'Loading...' : 'Compare Permissions'}
             </button>
             
+            <div className="flex-1"></div>
+            
             {diffs.length > 0 && (
-              <>
-                <button
-                  onClick={syncPermissions}
-                  disabled={syncing || selectedDiffs.length === 0}
-                  className="btn btn-success mr-4"
-                >
-                  {syncing ? 'Syncing...' : `Sync Selected (${filteredDiffs.filter(d => selectedDiffs.includes(d.key)).length})`}
-                </button>
-                
-                <button
-                  onClick={handleSelectAll}
-                  className="btn btn-secondary mr-2"
-                >
-                  Select All Visible
-                </button>
-                
-                <button
-                  onClick={handleDeselectAll}
-                  className="btn btn-secondary"
-                >
-                  Deselect All
-                </button>
-              </>
+              <button
+                onClick={syncPermissions}
+                disabled={syncing || selectedDiffs.length === 0}
+                className="btn btn-success"
+              >
+                {syncing ? 'Syncing...' : `Sync Selected (${filteredDiffs.filter(d => selectedDiffs.includes(d.key)).length})`}
+              </button>
             )}
           </div>
 
@@ -416,18 +390,36 @@ export default function Home() {
               </div>
               
               <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="text-sm text-gray-600">
-                  Showing: <span className="font-semibold">{filteredDiffs.length}</span> of <span className="font-semibold">{policyFilteredSummary.total}</span> permissions
-                  {selectedPolicy !== 'all' && (
-                    <span className="ml-2 text-blue-600">
-                      • Filtered by: <span className="font-medium">{selectedPolicy}</span>
-                    </span>
-                  )}
-                  {policyFilteredSummary.total !== diffs.length && (
-                    <span className="ml-2 text-gray-500">
-                      (Total available: {diffs.length})
-                    </span>
-                  )}
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing: <span className="font-semibold">{filteredDiffs.length}</span> of <span className="font-semibold">{policyFilteredSummary.total}</span> permissions
+                    {selectedPolicy !== 'all' && (
+                      <span className="ml-2 text-blue-600">
+                        • Filtered by: <span className="font-medium">{selectedPolicy}</span>
+                      </span>
+                    )}
+                    {policyFilteredSummary.total !== diffs.length && (
+                      <span className="ml-2 text-gray-500">
+                        (Total available: {diffs.length})
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleSelectAll}
+                      className="btn btn-secondary text-sm px-3 py-1"
+                    >
+                      Select All Visible
+                    </button>
+                    
+                    <button
+                      onClick={handleDeselectAll}
+                      className="btn btn-secondary text-sm px-3 py-1"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,0 +1,18 @@
+/* Hide any <div> that contains an <i> element with data-icon="settings" */
+div.v-button:has(i[data-icon="settings"]) {
+  display: none;
+}
+/* Settings */
+a[href="/admin/settings/data-model"]
+, a[href="/admin/settings/flows"] 
+, a[href="/admin/settings/roles"] 
+, a[href="/admin/settings/project"]
+, a[href="/admin/settings/appearance"]  
+, a[href="/admin/settings/translations"] 
+, a[href="/admin/settings/marketplace"] 
+, a[href="/admin/settings/extensions"] 
+, a[href*="github"] 
+, .inlineTitle
+{
+  display: none !important;
+}
